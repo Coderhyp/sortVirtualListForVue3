@@ -9,7 +9,7 @@
       <Tab @tab-change="onTabChange" />
 
       <div class="result">Items count: {{ items.length }}.</div>
-      <div @click="changeIndex">changeIndex</div>
+
       <div v-show="isShowView">
         <VirtualList
           ref="virtualListRef"
@@ -21,6 +21,7 @@
           :estimate-size="70"
           :item-class="'list-item-infinite'"
           :footer-class="'loader-wrapper'"
+          @totop="onScrollToTop"
           @tobottom="onScrollToBottom"
           @scroll="onVirtualScroll"
         >
@@ -35,15 +36,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import {
-  onMounted,
-  ref,
-  reactive,
-  nextTick,
-  watch,
-  onUnmounted,
-  computed,
-} from "vue";
+import { onMounted, ref, reactive, nextTick, watch, onUnmounted } from "vue";
 import { Random } from "mockjs";
 // @ts-ignore
 import VirtualList from "vue3-virtual-scroll-list";
@@ -56,9 +49,9 @@ import Item from "./Item.vue";
 import { TAB_TYPE, DEFAULT_TAB } from "../../common/const";
 import getSentences from "../../common/sentences";
 import genUniqueId from "../../common/gen-unique-id";
-import { cloneDeep } from "lodash-es";
-import Sortable, { SortableEvent, clone } from "sortablejs";
-console.log(VirtualList);
+
+import SortableWrapper from "./dragPolicy";
+
 const getPageData = (count: number, currentLength: number) => {
   const DataItems = [];
   for (let i = 0; i < count; i++) {
@@ -77,8 +70,7 @@ const getPageData = (count: number, currentLength: number) => {
 // };
 const pageSize = 10;
 const items = ref(getPageData(pageSize, 0));
-const originSouce = ref(cloneDeep(items.value));
-
+console.log(items.value, "看看items啥样");
 onMounted(() => {
   initSortable();
 });
@@ -101,48 +93,26 @@ const onVirtualScroll = (e, range) => {
     realDomStart.value = start;
   }
 };
-
-const virtualListRef = ref();
+let Sortable: any;
 const initSortable = () => {
   const el = document.querySelector("#list>div");
-  nextTick(() => {
-    new Sortable(el, {
-      animation: 150,
-      dataIdAttr: "data-id",
-      onMove: handleSortMove,
-      onEnd: handleSortEnd,
-    });
-  });
+  Sortable = new SortableWrapper(
+    el,
+    items.value,
+    realDomStart.value,
+    (dragEndData) => {
+      // console.log(dragEndData);
+      items.value = [...dragEndData];
+    }
+  );
 };
-const handleSortMove = (event) => {
-  // console.log(event);
-};
-const handleSortEnd = (event) => {
-  // draggingRealIndex应该是元素所在位置 直接通过id匹配在数组中获取
-  const id = event.item.children[0].getAttribute("data-id");
-  const draggingRealIndex = items.value.findIndex((item) => item.id === id);
-  // const draggingRealIndex = event.oldIndex + realDomStart.value;
-  const realNewIdx = realDomStart.value + event.newIndex;
-  console.log(draggingRealIndex, realNewIdx, "kankanananananananaIDNS");
-  const item = items.value.splice(draggingRealIndex, 1)[0];
-  // [cloneList.value[draggingRealIndex], cloneList.value[realNewIdx]] = [
-  //   cloneList.value[realNewIdx],
-  //   cloneList.value[draggingRealIndex],
-  // ];
-  items.value.splice(realNewIdx, 0, item);
-  const Ilength = items.value.length;
-  const newArr = items.value.slice(0);
-
-  console.log(originSouce.value, "itemssssssssss");
-  items.value = [];
-
-  nextTick(() => {
-    items.value = newArr;
-  });
-};
-const changeIndex = () => {
-  // items.value.splice(items.value.length, 0, items.value[0]);
-};
+watch(
+  () => realDomStart.value,
+  (val) => {
+    console.log(realDomStart.value, ".value.value.value");
+    Sortable.updateRealDomStart(val);
+  }
+);
 watch(
   () => items.value,
   (val) => {
@@ -150,9 +120,32 @@ watch(
   },
   {
     immediate: true,
-    deep: true,
   }
 );
+
+// ...
+
+watch(
+  () => Sortable,
+  (newVal) => {
+    console.log("bianlema");
+    items.value = newVal;
+  }
+);
+
+const onScrollToTop = () => {
+  console.log("at top");
+  if (isLoading.value) {
+    return;
+  }
+
+  isLoading.value = true;
+
+  setTimeout(() => {
+    isLoading.value = false;
+    items.value = getPageData(pageSize, items.value.length).concat(items.value);
+  }, 500);
+};
 
 const onScrollToBottom = () => {
   console.log("at bottom");
@@ -165,10 +158,11 @@ const onScrollToBottom = () => {
 
   setTimeout(() => {
     isLoading.value = false;
-    items.value = items.value.concat(getPageData(pageSize, items.value.length));
-    originSouce.value = originSouce.value.concat(
-      getPageData(pageSize, originSouce.value.length)
+    items.value = items.value.concat(
+      reactive(getPageData(pageSize, items.value.length))
     );
+    console.log(items.value, "itemsvalue");
+    Sortable.updateDataSource(items.value);
   }, 500);
 };
 </script>

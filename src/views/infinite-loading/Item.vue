@@ -15,7 +15,7 @@ const upToTop = (index: number) => {
 </script>
 
 <template>
-  <div class="item-inner" :data-id="source.id">
+  <div class="item-inner" :key="source.id" :data-id="source.id">
     <div class="head">
       <span class="index"># {{ source.index }}</span>
       <span class="name">{{ source.name }}</span>

@@ -10,8 +10,9 @@
 
       <div class="result">Items count: {{ items.length }}.</div>
       <div @click="changeIndex">changeIndex</div>
-      <div v-show="isShowView">
+      <div v-show="isShowView" class="virtualscrollDrag">
         <VirtualList
+          :key="randomKey"
           ref="virtualListRef"
           id="list"
           class="list-infinite scroll-touch"
@@ -19,6 +20,7 @@
           :data-sources="items"
           :data-component="Item"
           :estimate-size="70"
+          :keeps="20"
           :item-class="'list-item-infinite'"
           :footer-class="'loader-wrapper'"
           @tobottom="onScrollToBottom"
@@ -58,7 +60,7 @@ import getSentences from "../../common/sentences";
 import genUniqueId from "../../common/gen-unique-id";
 import { cloneDeep } from "lodash-es";
 import Sortable, { SortableEvent, clone } from "sortablejs";
-console.log(VirtualList);
+
 const getPageData = (count: number, currentLength: number) => {
   const DataItems = [];
   for (let i = 0; i < count; i++) {
@@ -117,27 +119,45 @@ const initSortable = () => {
 const handleSortMove = (event) => {
   // console.log(event);
 };
+const randomKey = ref(new Date().getTime());
+const wrapTop = ref(0);
+const needScroll = ref(false);
+
 const handleSortEnd = (event) => {
   // draggingRealIndex应该是元素所在位置 直接通过id匹配在数组中获取
   const id = event.item.children[0].getAttribute("data-id");
   const draggingRealIndex = items.value.findIndex((item) => item.id === id);
   // const draggingRealIndex = event.oldIndex + realDomStart.value;
-  const realNewIdx = realDomStart.value + event.newIndex;
-  console.log(draggingRealIndex, realNewIdx, "kankanananananananaIDNS");
-  const item = items.value.splice(draggingRealIndex, 1)[0];
-  // [cloneList.value[draggingRealIndex], cloneList.value[realNewIdx]] = [
-  //   cloneList.value[realNewIdx],
-  //   cloneList.value[draggingRealIndex],
-  // ];
-  items.value.splice(realNewIdx, 0, item);
-  const Ilength = items.value.length;
-  const newArr = items.value.slice(0);
 
-  console.log(originSouce.value, "itemssssssssss");
-  items.value = [];
+  const realNewIdx = realDomStart.value + event.newIndex;
+  console.log(
+    realNewIdx,
+    draggingRealIndex,
+    "draggingRealIndexdraggingRealIndex"
+  );
+  const newArr = cloneDeep(items.value);
+
+  const item = newArr.splice(draggingRealIndex, 1)[0];
+
+  // console.log("b", cloneDeep(items.value));
+  // items.value = cloneDeep(newArr);
+  newArr.splice(realNewIdx, 0, item);
+  originSouce.value = cloneDeep(newArr);
+  // items.value = cloneDeep(newArr);
+  console.log("a", cloneDeep(originSouce.value));
+
+  wrapTop.value = document.querySelector(".virtualscrollDrag #list").scrollTop;
+
+  // randomKey.value = new Date().getTime();
 
   nextTick(() => {
-    items.value = newArr;
+    const dom = document.querySelector(".virtualscrollDrag #list");
+
+    dom.scrollTop = wrapTop.value;
+    if (dom.scrollTop !== wrapTop.value) {
+      needScroll.value = true;
+    }
+    initSortable();
   });
 };
 const changeIndex = () => {
@@ -146,13 +166,14 @@ const changeIndex = () => {
 watch(
   () => items.value,
   (val) => {
-    console.log(val, "VALLLLLLLLLLLLLLL");
+    // console.log(val, "VALLLLLLLLLLLLLLL");
   },
   {
     immediate: true,
     deep: true,
   }
 );
+const wrapHeight = ref(0);
 
 const onScrollToBottom = () => {
   console.log("at bottom");
@@ -166,9 +187,20 @@ const onScrollToBottom = () => {
   setTimeout(() => {
     isLoading.value = false;
     items.value = items.value.concat(getPageData(pageSize, items.value.length));
-    originSouce.value = originSouce.value.concat(
-      getPageData(pageSize, originSouce.value.length)
-    );
+    // console.log(virtualListRef.value.getSize(), "virtualListRef.value");
+
+    function fn(dom, distance) {
+      dom.scrollTop = distance;
+      if (dom.scrollTop !== distance) {
+        nextTick(() => {
+          fn(dom, distance);
+        });
+      } else {
+        needScroll.value = false;
+      }
+    }
+    needScroll.value &&
+      fn(document.querySelector(".virtualscrollDrag #list"), wrapTop.value);
   }, 500);
 };
 </script>

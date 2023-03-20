@@ -27,6 +27,7 @@ const upToTop = (index: number) => {
 
 <style lang="less" scoped>
 .item-inner {
+  height: 200px;
   .head {
     font-weight: 500;
   }
